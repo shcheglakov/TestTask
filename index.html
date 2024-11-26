@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Отслеживание грузов</title>
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" integrity="sha512-9usAa10IRO0HhonpyAIVpjrylPvoDwiPUiKdWk5t3PyolY1cOd4DSE0Ga+ri4AuTroPR5aQvXU9xC6qOPnzFeg==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+    <style>
+        .status-yellow { background-color: #FFFF00; }
+        .status-blue { background-color: #0000FF; }
+        .status-green { background-color: #00FF00; }
+    </style>
+</head>
+<body>
+    <div class="container mt-4">
+        <h1>Отслеживание грузов</h1>
+
+        <div class="card mb-3">
+            <div class="card-header">
+                Добавить груз
+            </div>
+            <div class="card-body">
+                <form id="addCargoForm">
+                    <div class="form-group">
+                        <label for="name">Название груза</label>
+                        <input type="text" class="form-control" id="name" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="origin">Пункт отправления</label>
+                        <select class="form-control" id="origin" required>
+                            <option value="Москва">Москва</option>
+                            <option value="Санкт-Петербург">Санкт-Петербург</option>
+                            <option value="Казань">Казань</option>
+                            <option value="Екатеринбург">Екатеринбург</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="destination">Пункт назначения</label>
+                        <select class="form-control" id="destination" required>
+                            <option value="Москва">Москва</option>
+                            <option value="Санкт-Петербург">Санкт-Петербург</option>
+                            <option value="Казань">Казань</option>
+                            <option value="Екатеринбург">Екатеринбург</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="departureDate">Дата отправления</label>
+                        <input type="date" class="form-control" id="departureDate" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Добавить</button>
+                </form>
+            </div>
+        </div>
+
+
+        <div class="card">
+            <div class="card-header">
+                Список грузов <select id="statusFilter" class="form-control-sm float-right">
+                    <option value="">Все статусы</option>
+                    <option value="Ожидает отправки">Ожидает отправки</option>
+                    <option value="В пути">В пути</option>
+                    <option value="Доставлен">Доставлен</option>
+                </select>
+            </div>
+            <div class="card-body">
+                <table class="table table-striped" id="cargoTable">
+                    <thead>
+                        <tr>
+                            <th>Номер</th>
+                            <th>Название</th>
+                            <th>Статус</th>
+                            <th>Отправление</th>
+                            <th>Назначение</th>
+                            <th>Дата отправления</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script>
+
+        const statuses = ["Ожидает отправки", "В пути", "Доставлен"];
+        let nextCargoId = 1;
+
+        function loadCargoList() {
+            let cargoList = localStorage.getItem('cargoList');
+            return cargoList ? JSON.parse(cargoList) : [];
+        }
+
+        function saveCargoList(cargoList) {
+            localStorage.setItem('cargoList', JSON.stringify(cargoList));
+        }
+
+        function generateCargoId(cargoList) {
+            if (cargoList.length === 0) return "CARGO001";
+            const lastId = parseInt(cargoList[cargoList.length - 1].id.substring(6));
+            return "CARGO" + String(lastId + 1).padStart(3, '0');
+        }
+
+        let cargoList = loadCargoList();
+        nextCargoId = cargoList.length > 0 ? parseInt(cargoList[cargoList.length - 1].id.substring(6)) + 1 : 1;
+
+
+        function renderCargoTable() {
+            const tbody = document.querySelector("#cargoTable tbody");
+            tbody.innerHTML = "";
+
+            const filteredCargo = document.getElementById('statusFilter').value ? cargoList.filter(cargo => cargo.status === document.getElementById('statusFilter').value) : cargoList;
+
+            filteredCargo.forEach(cargo => {
+                const row = tbody.insertRow();
+                row.insertCell().textContent = cargo.id;
+                row.insertCell().textContent = cargo.name;
+
+                const statusCell = row.insertCell();
+                const statusSelect = document.createElement("select");
+                statusSelect.classList.add("form-control-sm");
+                statuses.forEach(status => {
+                    const option = document.createElement("option");
+                    option.value = status;
+                    option.text = status;
+                    option.selected = status === cargo.status;
+                    statusSelect.appendChild(option);
+                });
+                statusSelect.addEventListener("change", () => {
+                    const newStatus = statusSelect.value;
+                    const departureDate = new Date(cargo.departureDate);
+                    const today = new Date();
+
+                    if (newStatus === "Доставлен" && departureDate > today) {
+                        alert("Нельзя изменить статус на 'Доставлен', если дата отправления в будущем!");
+                        return;
+                    }
+
+                    cargo.status = newStatus;
+
+                    saveCargoList(cargoList);
+                    renderCargoTable();
+                });
+                statusCell.appendChild(statusSelect);
+
+                const statusClass = cargo.status === "Ожидает отправки" ? "status-yellow" : (cargo.status === "В пути" ? "status-blue" : "status-green");
+                statusCell.classList.add(statusClass);
+
+
+                row.insertCell().textContent = cargo.origin;
+                row.insertCell().textContent = cargo.destination;
+                row.insertCell().textContent = cargo.departureDate;
+            });
+        }
+
+        document.getElementById("addCargoForm").addEventListener("submit", (event) => {
+            event.preventDefault();
+            const name = document.getElementById("name").value;
+            const origin = document.getElementById("origin").value;
+            const destination = document.getElementById("destination").value;
+            const departureDate = document.getElementById("departureDate").value;
+
+            if (!name || !origin || !destination || !departureDate) {
+                alert("Пожалуйста, заполните все поля!");
+                return;
+            }
+
+            const newCargo = {
+                id: generateCargoId(cargoList),
+                name: name,
+                status: "Ожидает отправки",
+                origin: origin,
+                destination: destination,
+                departureDate: departureDate
+            };
+
+            cargoList.push(newCargo);
+            saveCargoList(cargoList);
+            renderCargoTable();
+            event.target.reset();
+        });
+
+        document.getElementById('statusFilter').addEventListener('change', renderCargoTable);
+
+        renderCargoTable();
+    </script>
+</body>
+</html>
